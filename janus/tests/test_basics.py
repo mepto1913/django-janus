@@ -68,23 +68,26 @@ class UserAuthenticationTest(TestCase):
                                                 name='test_all_superuser', skip_authorization=True)
 
         forbidden_app = Application.objects.get_or_create(user=user_1,
-                                                redirect_uris='https://localhost:8000/accounts/janus/login/callback/',
-                                                client_type='confidential',
-                                                authorization_grant_type='authorization-code',
-                                                name='test_forbidden', skip_authorization=True)
+                                                          redirect_uris='https://localhost:8000/accounts/janus/login/callback/',
+                                                          client_type='confidential',
+                                                          authorization_grant_type='authorization-code',
+                                                          name='test_forbidden', skip_authorization=True)
 
-        gp_1 = GroupPermission.objects.get_or_create(profile_group=user_group_1[0], application=app[0], can_authenticate=True, is_superuser=True)
+        gp_1 = GroupPermission.objects.get_or_create(profile_group=user_group_1[0], application=app[0],
+                                                     can_authenticate=True, is_superuser=True)
 
-        gp_1_second_app = GroupPermission.objects.get_or_create(profile_group=user_group_2[0], application=second_app, can_authenticate=True, is_superuser=True)
+        gp_1_second_app = GroupPermission.objects.get_or_create(profile_group=user_group_2[0], application=second_app,
+                                                                can_authenticate=True, is_superuser=True)
 
-        gp_2 = GroupPermission.objects.get_or_create(profile_group=user_group_2[0], application=app[0], can_authenticate=True, is_superuser=False)
+        gp_2 = GroupPermission.objects.get_or_create(profile_group=user_group_2[0], application=app[0],
+                                                     can_authenticate=True, is_superuser=False)
 
         ProfilePermission.objects.create(profile=profile_3, application=app[0], is_superuser=True)
 
-        #Grant.objects.create(user=user_1, code='abc', application=app[0], expires=now() + timedelta(days=5), redirect_uri='https://localhost:8000/accounts/janus/login/callback/')
-        #Grant.objects.create(user=user_2, code='abcd', application=app[0], expires=now() + timedelta(days=5), redirect_uri='https://localhost:8000/accounts/janus/login/callback/')
-        #Grant.objects.create(user=user_3, code='abcde', application=app[0], expires=now() + timedelta(days=5), redirect_uri='https://localhost:8000/accounts/janus/login/callback/')
-        #Grant.objects.create(user=user_4, code='abcdef', application=forbidden_app[0], expires=now() + timedelta(days=5), redirect_uri='https://localhost:8000/accounts/janus/login/callback/')
+        # Grant.objects.create(user=user_1, code='abc', application=app[0], expires=now() + timedelta(days=5), redirect_uri='https://localhost:8000/accounts/janus/login/callback/')
+        # Grant.objects.create(user=user_2, code='abcd', application=app[0], expires=now() + timedelta(days=5), redirect_uri='https://localhost:8000/accounts/janus/login/callback/')
+        # Grant.objects.create(user=user_3, code='abcde', application=app[0], expires=now() + timedelta(days=5), redirect_uri='https://localhost:8000/accounts/janus/login/callback/')
+        # Grant.objects.create(user=user_4, code='abcdef', application=forbidden_app[0], expires=now() + timedelta(days=5), redirect_uri='https://localhost:8000/accounts/janus/login/callback/')
 
     def test_not_authenticated(self):
         c = Client()
@@ -119,7 +122,6 @@ class UserAuthenticationTest(TestCase):
         # lookup response code
         parsed = urlparse.urlparse(response.url)
         code = parse_qs(parsed.query)['code']
-
 
         token_url = reverse('token')
         response = c.post(token_url, dict(grant_type='authorization_code', code=code,
@@ -178,8 +180,6 @@ class UserAuthenticationTest(TestCase):
         self.assertEqual(response.status_code, 200)
         tokens = json.loads(response.content.decode('utf-8'))
 
-
-
         # get the profile
         profile_uri = reverse('profile')
         response = c.get(profile_uri, dict(access_token=tokens['access_token']))
@@ -219,11 +219,10 @@ class UserAuthenticationTest(TestCase):
         parsed = urlparse.urlparse(response2.url)
         code = parse_qs(parsed.query)['code']
 
-
         token_url = reverse('token')
         response3 = c.post(token_url, dict(grant_type='authorization_code', code=code,
-                                          client_id=app.client_id, client_secret=app.client_secret,
-                                          redirect_uri='https://localhost:8000/accounts/janus/login/callback/'))
+                                           client_id=app.client_id, client_secret=app.client_secret,
+                                           redirect_uri='https://localhost:8000/accounts/janus/login/callback/'))
         self.assertEqual(response3.status_code, 200)
         tokens = json.loads(response3.content.decode('utf-8'))
 
@@ -236,6 +235,30 @@ class UserAuthenticationTest(TestCase):
         self.assertEqual(data['id'], 'eve')
         self.assertTrue(data['is_superuser'])
 
+
+class PermissionViewTests(TestCase):
+    def setUp(self):
+        self.group_default = ProfileGroup.objects.create(name='default', default=True)
+        self.group_1 = ProfileGroup.objects.create(name='Gruppe 1', default=True)
+        self.user = User.objects.create(username='user')
+        self.profile = Profile.create_default_profile(self.user)
+        self.profile.group.add(self.group_1)
+
+        self.user.group.add(self.group_1)
+        self.application_1 = Application.objects.create(user=None,
+                                                        redirect_uris='https://localhost:8000/accounts/janus/login/callback/',
+                                                        client_type='confidential',
+                                                        authorization_grant_type='authorization-code',
+                                                        name='test', skip_authorization=True)
+        GroupPermission.objects.create(profile_group=self.group_1,
+                                       application=self.application_1,
+                                       can_authenticate=True,
+                                       is_staff=False,
+                                       is_superuser=True)
+    def test_group_permissions(self):
+        pv = ProfileView()
+        pv.get_group_permissions(self.user, self.application_1)
+        self.assertEqual((True, False, True))
 
 
 
@@ -259,30 +282,30 @@ class ProfileViewTests(TestCase):
 
         # some apps
         self.application_one = Application.objects.create(user=None,
-                                                redirect_uris='https://localhost:8000/accounts/janus/login/callback/',
-                                                client_type='confidential',
-                                                authorization_grant_type='authorization-code',
-                                                name='test', skip_authorization=True)
+                                                          redirect_uris='https://localhost:8000/accounts/janus/login/callback/',
+                                                          client_type='confidential',
+                                                          authorization_grant_type='authorization-code',
+                                                          name='test', skip_authorization=True)
         self.application_two = Application.objects.create(user=None,
-                                                redirect_uris='https://localhost:8000/accounts/janus/login/callback/',
-                                                client_type='confidential',
-                                                authorization_grant_type='authorization-code',
-                                                name='test_all_superuser', skip_authorization=True)
+                                                          redirect_uris='https://localhost:8000/accounts/janus/login/callback/',
+                                                          client_type='confidential',
+                                                          authorization_grant_type='authorization-code',
+                                                          name='test_all_superuser', skip_authorization=True)
 
         # generate some application groups (the groups will be returned to the app on profile call)
         staff_app_group = ApplicationGroup.objects.create(application=self.application_one,
-                                                                 name="django_user_staff",
-                                                                 description="staff")
+                                                          name="django_user_staff",
+                                                          description="staff")
         customer_app_group = ApplicationGroup.objects.create(application=self.application_one,
-                                                                    name="django_customer",
-                                                                    description="customer")
+                                                             name="django_customer",
+                                                             description="customer")
 
         app2_group1 = ApplicationGroup.objects.create(application=self.application_two,
-                                                                    name="group1")
+                                                      name="group1")
         app2_group2 = ApplicationGroup.objects.create(application=self.application_two,
-                                                                            name="group2")
+                                                      name="group2")
         app2_group3 = ApplicationGroup.objects.create(application=self.application_one,
-                                                                            name="group3")
+                                                      name="group3")
 
         # add app_groups to profile_groups iva (profile)group permissions
         gp1 = GroupPermission.objects.create(profile_group=self.group_staff, application=self.application_one)
@@ -291,23 +314,20 @@ class ProfileViewTests(TestCase):
         gp2 = GroupPermission.objects.create(profile_group=self.group_staff, application=self.application_one)
         gp2.groups.add(customer_app_group)
 
-
         gp2 = GroupPermission.objects.create(profile_group=self.group_superuser, application=self.application_two)
-        gp2.groups.add(app2_group1, app2_group2, app2_group3) # group3 is not supposed in here, simulate human error
-
-
+        gp2.groups.add(app2_group1, app2_group2, app2_group3)  # group3 is not supposed in here, simulate human error
 
     def test_replace_keys_by_application(self):
         data = {
             'id': 1,
             'more': 'data'
-            }
+        }
 
         app_new = Application.objects.create(user=self.user_admin,
-                                                redirect_uris='https://localhost:8000/accounts/janus/login/callback/',
-                                                client_type='confidential',
-                                                authorization_grant_type='authorization-code',
-                                                name='test_new', skip_authorization=True)
+                                             redirect_uris='https://localhost:8000/accounts/janus/login/callback/',
+                                             client_type='confidential',
+                                             authorization_grant_type='authorization-code',
+                                             name='test_new', skip_authorization=True)
 
         app_new_extension = ApplicationExtension.objects.create(
             application=app_new,
@@ -336,10 +356,8 @@ class ProfileViewTests(TestCase):
         self.assertIn("django_user_staff", list_group_names)
         self.assertIn("django_customer", list_group_names)
 
-
         list_empty_groups = pv.get_profile_group_memberships(self.user_customer, self.application_one)
         self.assertAlmostEqual(len(list_empty_groups), 0)
-
 
         # test super user has on app2 -> group1, group2
         self.user_admin.profile.group.add(self.group_superuser)
@@ -350,7 +368,3 @@ class ProfileViewTests(TestCase):
         # also group3 is only linked to the wrong app so its also not present in the desired app
         list_empty_again = pv.get_profile_group_memberships(self.user_admin, self.application_one)
         self.assertAlmostEqual(len(list_empty_again), 0)
-
-
-
-
