@@ -86,9 +86,13 @@ class ProfileView(ProtectedResourceView):
                 continue
             elif gp.count() == 1:
                 gp = gp.first()
-                can_authenticate = gp.can_authenticate
-                is_staff = gp.is_staff
-                is_superuser = gp.is_superuser
+                # IMPORTANT: This is intentional: positiv additiv
+                if gp.can_authenticate:
+                    can_authenticate = True
+                if gp.is_staff:
+                    is_staff = True
+                if gp.is_superuser:
+                    is_superuser = True
             else:
                 print('We have a problem')
         return can_authenticate, is_staff, is_superuser
@@ -241,7 +245,7 @@ class ProfileView(ProtectedResourceView):
             'internal_id': user.id,
             'first_name': user.first_name,
             'last_name': user.last_name,
-            'name': user.first_name + ' ' + user.last_name,
+            'name': f"{user.first_name} {user.last_name}",
             'email': user.email,
             # ToDo: check the emails
             'email_verified': True,
